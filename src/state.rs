@@ -464,6 +464,17 @@ impl Estimator {
         let total_weight = 1.0 - estimator_weight(delta_t_start);
         let normalized_smoothed_steps_per_sec = self.smoothed_steps_per_sec / total_weight;
 
+        // The default rate is set to 0.0 on reset. However, that value would skew the estimate
+        // to be higher than it probably is. Thus, when recording the first step, we just
+        // "initialize" this to that rate.
+        if self.double_smoothed_steps_per_sec == 0.0 {
+            self.double_smoothed_steps_per_sec = normalized_smoothed_steps_per_sec;
+        }
+
+        // determine the double smoothed value (EWA smoothing of the single EWA)
+        self.double_smoothed_steps_per_sec = self.double_smoothed_steps_per_sec * weight
+            + normalized_smoothed_steps_per_sec * (1.0 - weight);
+
         // determine the double smoothed value (EWA smoothing of the single EWA)
         self.double_smoothed_steps_per_sec = self.double_smoothed_steps_per_sec * weight
             + normalized_smoothed_steps_per_sec * (1.0 - weight);
@@ -518,8 +529,7 @@ impl Estimator {
         // (sps and dsps) without storing them. Note that we normalize sps when using it as a
         // source to update dsps, and then normalize dsps itself before returning it.
         let sps = self.smoothed_steps_per_sec * reweight / total_weight;
-        let dsps = self.double_smoothed_steps_per_sec * reweight + sps * (1.0 - reweight);
-        dsps / total_weight
+        self.double_smoothed_steps_per_sec * reweight + sps * (1.0 - reweight)
     }
 }
 
